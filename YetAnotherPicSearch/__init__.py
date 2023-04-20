@@ -1,4 +1,8 @@
 import asyncio
+import requests
+from PIL import Image
+import os
+from io import BytesIO
 import re
 from collections import defaultdict
 from contextlib import suppress
@@ -100,7 +104,21 @@ async def image_search(
     index: Optional[int] = None,
 ) -> None:
     url = await get_universal_img_url(url)
+    TempName = "temp.jpg"
     cache_key = f"{md5}_{mode}"
+    #logger.info(f"The Image is {url}")
+    response = requests.get(url) #获取图片内容
+    with open(TempName,"wb") as f:
+            f.write(response.content)
+            img = Image.open(BytesIO(response.content))
+            SizeInKB = os.path.getsize(TempName)/1024
+            width, height = img.size
+            f.close()
+            logger.info(f"图片大小: {SizeInKB}KB")
+            os.remove(TempName)
+    if (width<900 and height <900) or SizeInKB <100: #粗略判断是否为表情包
+                 await IMAGE_SEARCH.finish()
+
     try:
         if not purge and cache_key in pic_search_cache:
             result, extra_handle = pic_search_cache[cache_key]
@@ -274,9 +292,7 @@ async def handle_image_search(bot: Bot, event: MessageEvent, matcher: Matcher) -
     if not image_urls_with_md5:
         await IMAGE_SEARCH.reject()
 
-    searching_tips: Dict[str, Any] = await IMAGE_SEARCH.send(
-        "正在进行搜索，请稍候", reply_message=True
-    )
+    #searching_tips: Dict[str, Any] = await IMAGE_SEARCH.send( "#正在进行搜索，请稍候", reply_message=True)
 
     mode, purge = matcher.state["ARGS"]
     network = (
@@ -297,4 +313,4 @@ async def handle_image_search(bot: Bot, event: MessageEvent, matcher: Matcher) -
                 index if len(image_urls_with_md5) > 1 else None,
             )
 
-    await bot.delete_msg(message_id=searching_tips["message_id"])
+    #await bot.delete_msg(message_id=searching_tips["message_id"])
